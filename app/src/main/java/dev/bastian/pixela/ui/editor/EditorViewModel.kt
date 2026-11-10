@@ -147,6 +147,62 @@ class EditorViewModel(
         refresh()
     }
 
+    fun addLayer() {
+        engine.addLayer(strings.layerName(engine.document.nextLayerId))
+        refresh()
+    }
+
+    fun selectLayer(id: Int) {
+        engine.selectLayer(id)
+        refresh()
+    }
+
+    fun toggleLayerVisible(id: Int) {
+        val layer = engine.document.layer(id)
+        engine.updateLayer(id, layer.name, !layer.visible, layer.opacity)
+        refresh()
+    }
+
+    fun renameLayer(id: Int, name: String) {
+        val layer = engine.document.layer(id)
+        val trimmed = name.trim()
+        if (trimmed.isNotEmpty()) engine.updateLayer(id, trimmed, layer.visible, layer.opacity)
+        refresh()
+    }
+
+    fun duplicateLayer(id: Int) {
+        engine.duplicateLayer(id, strings.copyOf(engine.document.layer(id).name))
+        refresh()
+    }
+
+    fun deleteLayer(id: Int) {
+        engine.deleteLayer(id)
+        refresh()
+    }
+
+    fun mergeLayerDown(id: Int) {
+        engine.mergeDown(id)
+        refresh()
+    }
+
+    /** Moves a layer one step towards the top ([up] true) or the bottom of the stack. */
+    fun moveLayer(id: Int, up: Boolean) {
+        val index = engine.document.layers.indexOfFirst { it.id == id }
+        engine.moveLayer(index, if (up) index + 1 else index - 1)
+        refresh()
+    }
+
+    fun previewLayerOpacity(id: Int, opacity: Float) {
+        engine.previewOpacity(id, opacity)
+        refresh()
+    }
+
+    fun commitLayerOpacity() {
+        engine.commitOpacity()
+        refresh()
+    }
+
+
     /** The composited pixels, for tests and exports. */
     fun compositePixels(): IntArray = composite(engine.document)
 }
