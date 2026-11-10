@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="gallery_empty">A�n no hay proyectos.</string>
+    <string name="gallery_empty">Aún no hay proyectos.</string>
+    <string name="gallery_new">Nuevo lienzo</string>
+    <string name="dialog_new_title">Tamaño del lienzo</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_back">Atrás</string>
+    <string name="action_undo">Deshacer</string>
+    <string name="action_redo">Rehacer</string>
+    <string name="editor_title">Editor</string>
+    <string name="tool_pencil">Lápiz</string>
+    <string name="tool_eraser">Goma</string>
+    <string name="layer_default_name">Capa %1$d</string>
+    <string name="project_default_name">Dibujo %1$d</string>
+    <string name="copy_of">Copia de %1$s</string>
 </resources>
