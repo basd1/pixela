@@ -58,7 +58,7 @@ fun PixelCanvas(
     val dark = isSystemInDarkTheme()
     val checker = remember(canvasSize, dark) { checkerImage(canvasSize, dark) }
     val renderedRevision = remember(bitmap) { intArrayOf(-1) }
-    val gridColor = if (dark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.18f)
+    val gridColor = if (dark) Color.White.copy(alpha = 0.28f) else Color.Black.copy(alpha = 0.28f)
 
     Canvas(
         modifier

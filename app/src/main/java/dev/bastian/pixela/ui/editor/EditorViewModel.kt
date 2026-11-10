@@ -2,14 +2,19 @@ package dev.bastian.pixela.ui.editor
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dev.bastian.pixela.domain.Document
 import dev.bastian.pixela.domain.EditorEngine
+import dev.bastian.pixela.domain.RecentColorsStore
 import dev.bastian.pixela.domain.Tool
 import dev.bastian.pixela.domain.composite
+import dev.bastian.pixela.domain.withRecent
 import dev.bastian.pixela.ui.Strings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 data class LayerItem(val id: Int, val name: String, val visible: Boolean, val opacity: Float)
 
@@ -19,17 +24,25 @@ data class EditorUiState(
     val color: Int = 0,
     val mirror: Boolean = false,
     val filledShapes: Boolean = false,
+    val showGrid: Boolean = true,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val layers: List<LayerItem> = emptyList(),
     val activeLayerId: Int = 0,
     val palette: List<Int> = emptyList(),
+    val recentColors: List<Int> = emptyList(),
     val canvasSize: Int = 0,
 )
 
-class EditorViewModel(size: Int, private val strings: Strings) : ViewModel() {
+class EditorViewModel(
+    size: Int,
+    private val strings: Strings,
+    private val recents: RecentColorsStore,
+) : ViewModel() {
     private val engine = EditorEngine(Document.blank(size, strings.layerName(1)))
     val canvas = CanvasState(size, size)
+
+    private var recentColors: List<Int> = emptyList()
 
     private val _state = MutableStateFlow(snapshot())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
@@ -41,16 +54,25 @@ class EditorViewModel(size: Int, private val strings: Strings) : ViewModel() {
 
     private val scratch = IntArray(size * size)
 
+    init {
+        viewModelScope.launch {
+            recentColors = recents.colors.first()
+            refresh()
+        }
+    }
+
     private fun snapshot() = EditorUiState(
         tool = engine.tool,
         color = engine.color,
         mirror = engine.mirror,
         filledShapes = engine.filledShapes,
+        showGrid = canvas.showGrid,
         canUndo = engine.history.canUndo,
         canRedo = engine.history.canRedo,
         layers = engine.document.layers.map { LayerItem(it.id, it.name, it.visible, it.opacity) },
         activeLayerId = engine.document.activeLayerId,
         palette = engine.document.palette,
+        recentColors = recentColors,
         canvasSize = engine.document.width,
     )
 
@@ -64,9 +86,33 @@ class EditorViewModel(size: Int, private val strings: Strings) : ViewModel() {
         composite(engine.document, scratch)
         bitmap.setPixels(scratch, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
     }
+
     fun selectTool(tool: Tool) {
         engine.cancelStroke()
         engine.tool = tool
+        refresh()
+    }
+
+    /** Picks a color from the palette, the color dialog or the recent list. */
+    fun selectColor(color: Int) {
+        engine.color = color
+        recentColors = recentColors.withRecent(color)
+        viewModelScope.launch { recents.save(recentColors) }
+        refresh()
+    }
+
+    fun toggleMirror() {
+        engine.mirror = !engine.mirror
+        refresh()
+    }
+
+    fun toggleFilledShapes() {
+        engine.filledShapes = !engine.filledShapes
+        refresh()
+    }
+
+    fun toggleGrid() {
+        canvas.showGrid = !canvas.showGrid
         refresh()
     }
 
@@ -100,5 +146,7 @@ class EditorViewModel(size: Int, private val strings: Strings) : ViewModel() {
         engine.redo()
         refresh()
     }
-}
 
+    /** The composited pixels, for tests and exports. */
+    fun compositePixels(): IntArray = composite(engine.document)
+}
