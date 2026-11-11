@@ -151,6 +151,8 @@ class EditorEngine(val document: Document, val history: History = History()) {
 
     fun addLayer(name: String) = run(LayerCommands.add(document, name))
 
+    fun importLayer(name: String, pixels: IntArray) = run(LayerCommands.addWithPixels(document, name, pixels))
+
     fun duplicateLayer(id: Int, name: String) = run(LayerCommands.duplicate(document, id, name))
 
     fun deleteLayer(id: Int) = run(LayerCommands.delete(document, id))

@@ -137,6 +137,13 @@ object LayerCommands {
         return AddLayer(layer, index, document.activeLayerId)
     }
 
+    /** A new layer above the active one, filled with [pixels] (an imported image). */
+    fun addWithPixels(document: Document, name: String, pixels: IntArray): Command {
+        val layer = Layer(document.newLayerId(), name, buffer = PixelBuffer(document.width, document.height, pixels))
+        val index = document.layers.indexOfFirst { it.id == document.activeLayerId } + 1
+        return AddLayer(layer, index, document.activeLayerId)
+    }
+
     fun duplicate(document: Document, id: Int, name: String): Command {
         val index = document.layers.indexOfFirst { it.id == id }
         val copy = document.layers[index].copy(id = document.newLayerId(), name = name)

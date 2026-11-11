@@ -1,5 +1,6 @@
 package dev.bastian.pixela.ui
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -7,15 +8,19 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.geometry.Offset
-import dev.bastian.pixela.domain.RecentColorsStore
+import dev.bastian.pixela.FakeExporter
+import dev.bastian.pixela.FakeImporter
+import dev.bastian.pixela.FakeProjectRepository
+import dev.bastian.pixela.FakeRecents
+import dev.bastian.pixela.FakeStrings
 import dev.bastian.pixela.domain.TRANSPARENT
+import dev.bastian.pixela.domain.Tool
 import dev.bastian.pixela.ui.editor.CANVAS_TAG
 import dev.bastian.pixela.ui.editor.EditorScreen
 import dev.bastian.pixela.ui.editor.EditorViewModel
 import dev.bastian.pixela.ui.theme.PixelaTheme
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,30 +35,24 @@ class EditorScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private class FakeStrings : Strings {
-        override fun layerName(number: Int) = "Layer $number"
-        override fun newProjectName(number: Int) = "Drawing $number"
-        override fun copyOf(name: String) = "$name copy"
-    }
-
-    private class FakeRecents : RecentColorsStore {
-        private val state = MutableStateFlow<List<Int>>(emptyList())
-        override val colors: Flow<List<Int>> = state
-        override suspend fun save(colors: List<Int>) {
-            state.value = colors
-        }
-    }
-
-    private fun viewModel() = EditorViewModel(16, FakeStrings(), FakeRecents())
+    private fun viewModel() = EditorViewModel(
+        projectId = "p1",
+        strings = FakeStrings(),
+        recents = FakeRecents(),
+        projects = FakeProjectRepository(size = 16),
+        exporter = FakeExporter(),
+        importer = FakeImporter(Result.success(IntArray(256))),
+        saveScope = CoroutineScope(Dispatchers.Unconfined),
+    )
 
     private fun launch(vm: EditorViewModel) {
-        compose.setContent { PixelaTheme { EditorScreen(size = 16, onBack = {}, viewModel = vm) } }
+        compose.setContent { PixelaTheme { EditorScreen(projectId = "p1", onBack = {}, viewModel = vm) } }
         compose.waitForIdle()
     }
 
     /** Centre of a canvas pixel, in the coordinates of the canvas node. */
     private fun EditorViewModel.centerOf(x: Int, y: Int): Offset {
-        val viewport = canvas.viewport!!
+        val viewport = canvas!!.viewport!!
         return Offset(viewport.pixelToScreenX(x) + viewport.scale / 2, viewport.pixelToScreenY(y) + viewport.scale / 2)
     }
 
@@ -63,7 +62,7 @@ class EditorScreenTest {
         launch(vm)
         compose.onNodeWithContentDescription("Line").performClick()
         compose.waitForIdle()
-        assertEquals(dev.bastian.pixela.domain.Tool.Line, vm.state.value.tool)
+        assertEquals(Tool.Line, vm.state.value.tool)
 
         val start = vm.centerOf(2, 3)
         val end = vm.centerOf(9, 3)

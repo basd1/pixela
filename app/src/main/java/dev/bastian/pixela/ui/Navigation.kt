@@ -13,17 +13,20 @@ import kotlinx.serialization.Serializable
 data object GalleryRoute
 
 @Serializable
-data class EditorRoute(val size: Int)
+data class EditorRoute(val projectId: String)
 
 @Composable
 fun PixelaNavHost() {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = GalleryRoute) {
         composable<GalleryRoute> {
-            GalleryScreen(onNewCanvas = { size -> navController.navigate(EditorRoute(size)) })
+            GalleryScreen(onOpen = { projectId -> navController.navigate(EditorRoute(projectId)) })
         }
         composable<EditorRoute> { entry ->
-            EditorScreen(size = entry.toRoute<EditorRoute>().size, onBack = { navController.popBackStack() })
+            EditorScreen(
+                projectId = entry.toRoute<EditorRoute>().projectId,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }
