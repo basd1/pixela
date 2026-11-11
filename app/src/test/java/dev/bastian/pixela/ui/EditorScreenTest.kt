@@ -1,9 +1,14 @@
 package dev.bastian.pixela.ui
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -18,6 +23,7 @@ import dev.bastian.pixela.domain.Tool
 import dev.bastian.pixela.ui.editor.CANVAS_TAG
 import dev.bastian.pixela.ui.editor.EditorScreen
 import dev.bastian.pixela.ui.editor.EditorViewModel
+import dev.bastian.pixela.ui.editor.LAYERS_PANEL_TAG
 import dev.bastian.pixela.ui.theme.PixelaTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -116,5 +123,63 @@ class EditorScreenTest {
         compose.waitForIdle()
         assertEquals(0, vm.compositePixels().count { it != TRANSPARENT })
         assertEquals(false, vm.state.value.canUndo)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `ctrl z undoes and ctrl shift z redoes from the keyboard`() {
+        val vm = viewModel()
+        launch(vm)
+        val point = vm.centerOf(5, 5)
+        compose.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            down(point)
+            up()
+        }
+        compose.waitForIdle()
+        assertEquals(1, vm.compositePixels().count { it != TRANSPARENT })
+
+        compose.onRoot().performKeyInput {
+            keyDown(Key.CtrlLeft)
+            pressKey(Key.Z)
+            keyUp(Key.CtrlLeft)
+        }
+        compose.waitForIdle()
+        assertEquals(0, vm.compositePixels().count { it != TRANSPARENT })
+
+        compose.onRoot().performKeyInput {
+            keyDown(Key.CtrlLeft)
+            keyDown(Key.ShiftLeft)
+            pressKey(Key.Z)
+            keyUp(Key.ShiftLeft)
+            keyUp(Key.CtrlLeft)
+        }
+        compose.waitForIdle()
+        assertEquals(1, vm.compositePixels().count { it != TRANSPARENT })
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `a phone shows the layers panel only in the sheet`() {
+        launch(viewModel())
+
+        compose.onNodeWithTag(LAYERS_PANEL_TAG).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Layers").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(LAYERS_PANEL_TAG).assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w1000dp-h700dp")
+    fun `a wide window keeps the layers panel and palette always visible`() {
+        val vm = viewModel()
+        launch(vm)
+
+        compose.onNodeWithTag(LAYERS_PANEL_TAG).assertExists()
+        compose.onNodeWithContentDescription("Layers").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Current color").assertExists()
+
+        compose.onNodeWithContentDescription("Fill bucket").performClick()
+        compose.waitForIdle()
+        assertEquals(Tool.Fill, vm.state.value.tool)
     }
 }

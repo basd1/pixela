@@ -9,6 +9,23 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -193,11 +210,18 @@ private fun EditorLoaded(
             onDelete = viewModel::deleteLayer,
         )
     }
-    var pickingColor by remember { mutableStateOf(false) }
+    var pickingColor by rememberSaveable { mutableStateOf(false) }
     var showLayers by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(focus) { focus.requestFocus() }
 
+    val wide = LocalConfiguration.current.screenWidthDp >= WIDE_BREAKPOINT_DP
     Scaffold(
+        modifier = Modifier
+            .onPreviewKeyEvent { handleShortcut(it, viewModel::undo, viewModel::redo) }
+            .focusRequester(focus)
+            .focusable(),
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
@@ -214,8 +238,10 @@ private fun EditorLoaded(
                     IconButton(onClick = viewModel::redo, enabled = state.canRedo) {
                         Icon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.action_redo))
                     }
-                    IconButton(onClick = { showLayers = true }) {
-                        Icon(Icons.Filled.Layers, stringResource(R.string.layers_title))
+                    if (!wide) {
+                        IconButton(onClick = { showLayers = true }) {
+                            Icon(Icons.Filled.Layers, stringResource(R.string.layers_title))
+                        }
                     }
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
@@ -240,26 +266,55 @@ private fun EditorLoaded(
             )
         },
         bottomBar = {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                PaletteBar(state, onColor = viewModel::selectColor, onCustom = { pickingColor = true })
-                ToolBar(
+            if (!wide) {
+                Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    PaletteBar(state, onColor = viewModel::selectColor, onCustom = { pickingColor = true })
+                    ToolBar(
+                        state = state,
+                        onTool = viewModel::selectTool,
+                        onMirror = viewModel::toggleMirror,
+                        onFilled = viewModel::toggleFilledShapes,
+                        onGrid = viewModel::toggleGrid,
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        val canvas: @Composable (Modifier) -> Unit = { modifier ->
+            Box(modifier) {
+                PixelCanvas(
+                    state = canvasState,
+                    canvasSize = state.canvasSize,
+                    revision = revision,
+                    render = viewModel::render,
+                    callbacks = callbacks,
+                )
+            }
+        }
+        if (wide) {
+            Row(Modifier.fillMaxSize().padding(padding)) {
+                ToolRail(
                     state = state,
                     onTool = viewModel::selectTool,
                     onMirror = viewModel::toggleMirror,
                     onFilled = viewModel::toggleFilledShapes,
                     onGrid = viewModel::toggleGrid,
+                    modifier = Modifier.padding(8.dp),
                 )
+                canvas(Modifier.weight(1f).fillMaxHeight())
+                Column(Modifier.width(SIDE_PANEL_WIDTH).fillMaxHeight().padding(vertical = 8.dp)) {
+                    PalettePanel(
+                        state,
+                        onColor = viewModel::selectColor,
+                        onCustom = { pickingColor = true },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    LayersPanel(state, layerActions, Modifier.weight(1f))
+                }
             }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            PixelCanvas(
-                state = canvasState,
-                canvasSize = state.canvasSize,
-                revision = revision,
-                render = viewModel::render,
-                callbacks = callbacks,
-            )
+        } else {
+            canvas(Modifier.fillMaxSize().padding(padding))
         }
     }
 
@@ -273,12 +328,32 @@ private fun EditorLoaded(
             onDismiss = { pickingColor = false },
         )
     }
-    if (showLayers) {
+    if (showLayers && !wide) {
         ModalBottomSheet(
             onDismissRequest = { showLayers = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
             LayersPanel(state, layerActions, Modifier.navigationBarsPadding())
         }
+    }
+}
+
+/** Windows at least this wide (dp) get the side panels instead of the bottom bar and the layers sheet. */
+private const val WIDE_BREAKPOINT_DP = 840
+private val SIDE_PANEL_WIDTH = 300.dp
+
+/** Ctrl or Cmd + Z undoes, with Shift or Ctrl/Cmd + Y it redoes. Returns whether the key was used. */
+internal fun handleShortcut(event: KeyEvent, undo: () -> Unit, redo: () -> Unit): Boolean {
+    if (event.type != KeyEventType.KeyDown || !(event.isCtrlPressed || event.isMetaPressed)) return false
+    return when (event.key) {
+        Key.Z -> {
+            if (event.isShiftPressed) redo() else undo()
+            true
+        }
+        Key.Y -> {
+            redo()
+            true
+        }
+        else -> false
     }
 }

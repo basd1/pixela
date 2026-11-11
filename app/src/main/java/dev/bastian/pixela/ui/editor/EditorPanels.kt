@@ -6,9 +6,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixNormal
@@ -27,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -50,7 +55,7 @@ private val toolEntries = listOf(
     ToolEntry(Tool.Move, Icons.Filled.OpenWith, R.string.tool_move),
 )
 
-/** Tool buttons plus the mirror, filled-shape and grid toggles. */
+/** Tool buttons plus the mirror, filled-shape and grid toggles in a scrolling row (compact windows). */
 @Composable
 fun ToolBar(
     state: EditorUiState,
@@ -61,20 +66,46 @@ fun ToolBar(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        for (entry in toolEntries) {
-            FilledTonalIconToggleButton(checked = state.tool == entry.tool, onCheckedChange = { onTool(entry.tool) }) {
-                Icon(entry.icon, stringResource(entry.label))
-            }
+        ToolButtons(state, onTool, onMirror, onFilled, onGrid)
+    }
+}
+
+/** The same buttons stacked in a column, for the side of a wide window. */
+@Composable
+fun ToolRail(
+    state: EditorUiState,
+    onTool: (Tool) -> Unit,
+    onMirror: () -> Unit,
+    onFilled: () -> Unit,
+    onGrid: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        ToolButtons(state, onTool, onMirror, onFilled, onGrid)
+    }
+}
+
+@Composable
+private fun ToolButtons(
+    state: EditorUiState,
+    onTool: (Tool) -> Unit,
+    onMirror: () -> Unit,
+    onFilled: () -> Unit,
+    onGrid: () -> Unit,
+) {
+    for (entry in toolEntries) {
+        FilledTonalIconToggleButton(checked = state.tool == entry.tool, onCheckedChange = { onTool(entry.tool) }) {
+            Icon(entry.icon, stringResource(entry.label))
         }
-        FilledTonalIconToggleButton(checked = state.mirror, onCheckedChange = { onMirror() }) {
-            Icon(Icons.Filled.Flip, stringResource(R.string.toggle_mirror))
-        }
-        FilledTonalIconToggleButton(checked = state.filledShapes, onCheckedChange = { onFilled() }) {
-            Icon(Icons.Filled.Square, stringResource(R.string.toggle_filled))
-        }
-        FilledTonalIconToggleButton(checked = state.showGrid, onCheckedChange = { onGrid() }) {
-            Icon(Icons.Filled.GridOn, stringResource(R.string.toggle_grid))
-        }
+    }
+    FilledTonalIconToggleButton(checked = state.mirror, onCheckedChange = { onMirror() }) {
+        Icon(Icons.Filled.Flip, stringResource(R.string.toggle_mirror))
+    }
+    FilledTonalIconToggleButton(checked = state.filledShapes, onCheckedChange = { onFilled() }) {
+        Icon(Icons.Filled.Square, stringResource(R.string.toggle_filled))
+    }
+    FilledTonalIconToggleButton(checked = state.showGrid, onCheckedChange = { onGrid() }) {
+        Icon(Icons.Filled.GridOn, stringResource(R.string.toggle_grid))
     }
 }
 
@@ -89,18 +120,41 @@ fun PaletteBar(
     Row(
         modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Swatch(state.color, selected = true, description = stringResource(R.string.color_current), onClick = onCustom)
-        IconButton(onClick = onCustom) {
-            Icon(Icons.Filled.Palette, stringResource(R.string.color_custom))
-        }
-        for (color in state.recentColors) {
-            Swatch(color, selected = false, description = stringResource(R.string.color_recent), onClick = { onColor(color) })
-        }
-        for (color in state.palette) {
-            Swatch(color, selected = color == state.color, description = stringResource(R.string.color_palette), onClick = { onColor(color) })
-        }
+        PaletteSwatches(state, onColor, onCustom)
+    }
+}
+
+/** The same swatches wrapped over several lines, for the side panel of a wide window. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun PalettePanel(
+    state: EditorUiState,
+    onColor: (Int) -> Unit,
+    onCustom: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FlowRow(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        PaletteSwatches(state, onColor, onCustom)
+    }
+}
+
+@Composable
+private fun PaletteSwatches(state: EditorUiState, onColor: (Int) -> Unit, onCustom: () -> Unit) {
+    Swatch(state.color, selected = true, description = stringResource(R.string.color_current), onClick = onCustom)
+    IconButton(onClick = onCustom) {
+        Icon(Icons.Filled.Palette, stringResource(R.string.color_custom))
+    }
+    for (color in state.recentColors) {
+        Swatch(color, selected = false, description = stringResource(R.string.color_recent), onClick = { onColor(color) })
+    }
+    for (color in state.palette) {
+        Swatch(color, selected = color == state.color, description = stringResource(R.string.color_palette), onClick = { onColor(color) })
     }
 }
 
